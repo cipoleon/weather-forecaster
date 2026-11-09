@@ -38,15 +38,18 @@ export const conditions: Partial<Record<number, WeatherCondition>> = {
 };
 
 const days = [
-  "Vasárnap",
-  "Hetfő",
-  "Kedd",
-  "Szerda",
-  "Csütörtök",
-  "Péntek",
-  "Szombat",
+  { long: "Vasárnap", short: "V" },
+  { long: "Hétfő", short: "H" },
+  { long: "Kedd", short: "K" },
+  { long: "Szerda", short: "Sze" },
+  { long: "Csütörtök", short: "Cs" },
+  { long: "Péntek", short: "P" },
+  { long: "Szombat", short: "Szo" },
 ];
 
-export function getForecastDayLabel(time: string): string | undefined {
-  return days[new Date(time).getDay()];
+export function getForecastDayLabel(
+  date: string,
+  format: "long" | "short" = "long",
+): string | undefined {
+  return days[new Date(date).getUTCDay()]?.[format];
 }

@@ -1,5 +1,6 @@
 import { Box, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { getWeather } from "./api/forecastApi";
 import ApplicantName from "./components/ApplicantName";
 import CityModal from "./components/CityModal";
@@ -36,31 +37,17 @@ function readSavedCity(): CityItem | undefined {
 function App() {
   const [city, setCity] = useState(readSavedCity);
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(() => !city);
-  const [weather, setWeather] = useState(EMPTY_WEATHER);
-  const [hasWeatherError, setHasWeatherError] = useState(false);
-
-  useEffect(() => {
-    if (!city) return;
-
-    const { latitude, longitude } = city;
-    const controller = new AbortController();
-    const { signal } = controller;
-
-    async function loadWeather() {
-      try {
-        const weather = await getWeather(latitude, longitude, signal);
-        if (signal.aborted) return;
-
-        setWeather(weather);
-        setHasWeatherError(false);
-      } catch {
-        if (!signal.aborted) setHasWeatherError(true);
-      }
-    }
-
-    void loadWeather();
-    return () => controller.abort();
-  }, [city]);
+  const {
+    data: weather = EMPTY_WEATHER,
+    isError: hasWeatherError,
+    refetch: refreshForecast,
+  } = useQuery({
+    queryKey: ["forecast", city?.latitude, city?.longitude],
+    queryFn: city
+      ? ({ signal }) => getWeather(city.latitude, city.longitude, signal)
+      : skipToken,
+    placeholderData: keepPreviousData,
+  });
 
   function handleCitySelection(nextCity: CityItem) {
     try {
@@ -70,6 +57,13 @@ function App() {
     }
     setCity(nextCity);
     setIsCityPickerOpen(false);
+
+    if (
+      city?.latitude === nextCity.latitude &&
+      city.longitude === nextCity.longitude
+    ) {
+      void refreshForecast();
+    }
   }
 
   return (

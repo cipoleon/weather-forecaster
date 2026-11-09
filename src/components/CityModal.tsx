@@ -1,3 +1,5 @@
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import SearchIcon from "@mui/icons-material/Search";
 import {
   Modal,
   Box,
@@ -11,14 +13,14 @@ import {
   Fade,
   CircularProgress,
 } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { useState, type ChangeEvent } from "react";
 import { getCities } from "../api/cityApi";
 import { useDebounce } from "../hooks/useDebounce";
 import type { CityItem } from "../types/city.types";
-import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
 const MIN_SEARCH_LENGTH = 2;
+const CITY_SEARCH_STALE_TIME = 5 * 60 * 1000;
 
 const modalStyles = {
   position: "absolute",
@@ -64,12 +66,6 @@ type CityModalProps = {
   onSelectCity: (city: CityItem) => void;
 };
 
-type CitySearchResult = {
-  query: string;
-  cities: CityItem[];
-  error?: string;
-};
-
 export default function CityModal({
   open,
   canDismiss,
@@ -77,62 +73,32 @@ export default function CityModal({
   onSelectCity,
 }: CityModalProps) {
   const [query, setQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<CitySearchResult>();
   const debouncedQuery = useDebounce(query);
-  const result = searchResult?.query === query ? searchResult : undefined;
-  const cities = result?.cities ?? [];
-  const isLoading = query.length >= MIN_SEARCH_LENGTH && !result;
-
-  useEffect(() => {
-    if (!open || query !== debouncedQuery || query.length < MIN_SEARCH_LENGTH) {
-      return;
-    }
-
-    const controller = new AbortController();
-    const { signal } = controller;
-
-    async function searchCities() {
-      try {
-        const cities = await getCities(query, signal);
-        if (!signal.aborted) setSearchResult({ query, cities });
-      } catch {
-        if (signal.aborted) return;
-
-        setSearchResult({
-          query,
-          cities: [],
-          error: "Nem sikerült lekérni a városokat.",
-        });
-      }
-    }
-
-    void searchCities();
-    return () => controller.abort();
-  }, [open, query, debouncedQuery]);
-
-  function resetSearch() {
-    setQuery("");
-    setSearchResult(undefined);
-  }
+  const canSearch = open && query.length >= MIN_SEARCH_LENGTH;
+  const activeQuery = canSearch && query === debouncedQuery ? query : undefined;
+  const { data: cities = [], isError, isPending } = useQuery({
+    queryKey: ["city-search", activeQuery],
+    queryFn: activeQuery
+      ? ({ signal }) => getCities(activeQuery, signal)
+      : skipToken,
+    staleTime: CITY_SEARCH_STALE_TIME,
+  });
+  const isLoading = canSearch && isPending;
 
   function handleClose() {
     if (!canDismiss) return;
 
-    resetSearch();
+    setQuery("");
     onClose();
   }
 
   function handleCityClick(city: CityItem) {
-    resetSearch();
+    setQuery("");
     onSelectCity(city);
   }
 
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
-    const nextQuery = event.target.value.trim();
-    if (nextQuery === query) return;
-
-    setQuery(nextQuery);
-    setSearchResult(undefined);
+    setQuery(event.target.value.trim());
   }
 
   return (
@@ -206,9 +172,9 @@ export default function CityModal({
             </List>
           )}
 
-          {result && cities.length === 0 && (
+          {activeQuery && !isPending && cities.length === 0 && (
             <Typography id="modal-no-city" variant="body1" component="p">
-              {result.error ?? "Nincs Találat"}
+              {isError ? "Nem sikerült lekérni a városokat." : "Nincs Találat"}
             </Typography>
           )}
         </Box>
