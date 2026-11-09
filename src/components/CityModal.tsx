@@ -12,13 +12,15 @@ import {
   CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { getCities } from "../api/cityApi";
 import { useDebounce } from "../hooks/useDebounce";
 import type { CityItem } from "../types/city.types";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 
-const style = {
+const MIN_SEARCH_LENGTH = 2;
+
+const modalStyles = {
   position: "absolute",
   top: "20%",
   left: "50%",
@@ -57,80 +59,81 @@ const style = {
 
 type CityModalProps = {
   open: boolean;
-  city: CityItem | undefined;
-  // TODO Az id-k csekkolása, és a var nevek
-  setOpen: (open: boolean) => void;
-  setCity: (city: CityItem) => void;
+  canDismiss: boolean;
+  onClose: () => void;
+  onSelectCity: (city: CityItem) => void;
+};
+
+type CitySearchResult = {
+  query: string;
+  cities: CityItem[];
+  error?: string;
 };
 
 export default function CityModal({
-  city,
   open,
-  setOpen,
-  setCity,
+  canDismiss,
+  onClose,
+  onSelectCity,
 }: CityModalProps) {
-  const handleClose = () => {
-    if (city) {
-      closeModal();
-    }
-  };
-
-  const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [canShowNotFoundOrError, setCanShowNotFoundOrError] = useState(false);
-  const [error, setError] = useState("");
-  const debouncedSearch = useDebounce(search.trim(), 600);
-
-  const [cities, setCities] = useState<CityItem[]>([]);
-
-  const visibleCities = debouncedSearch.length >= 2 ? cities : [];
-
-  const handleOnCityClick = (cityItem: CityItem) => {
-    localStorage.setItem("city", JSON.stringify(cityItem));
-    setCity(cityItem);
-    closeModal();
-  };
-
-  const handleOnSearchChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement, Element>,
-  ) => {
-    const searchValue = event.target.value;
-    setSearch(searchValue);
-    setError("");
-    setIsLoading(true);
-    if (!searchValue) setCanShowNotFoundOrError(false);
-  };
-
-  const closeModal = () => {
-    setSearch("");
-    setError("");
-    setCanShowNotFoundOrError(false);
-    setCities([]);
-    setIsLoading(false);
-    setOpen(false);
-  };
+  const [query, setQuery] = useState("");
+  const [searchResult, setSearchResult] = useState<CitySearchResult>();
+  const debouncedQuery = useDebounce(query);
+  const result = searchResult?.query === query ? searchResult : undefined;
+  const cities = result?.cities ?? [];
+  const isLoading = query.length >= MIN_SEARCH_LENGTH && !result;
 
   useEffect(() => {
-    async function getData() {
-      await getCities(debouncedSearch)
-        .then((cities) => {
-          setError("");
-          setCities(cities);
-        })
-        .catch(() => {
-          setError("Nem sikerült lekérni a városokat.");
-          setCities([]);
-        })
-        .finally(() => {
-          setCanShowNotFoundOrError(true);
-          setIsLoading(false);
-        });
+    if (!open || query !== debouncedQuery || query.length < MIN_SEARCH_LENGTH) {
+      return;
     }
 
-    if (debouncedSearch.length >= 2) {
-      getData();
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    async function searchCities() {
+      try {
+        const cities = await getCities(query, signal);
+        if (!signal.aborted) setSearchResult({ query, cities });
+      } catch {
+        if (signal.aborted) return;
+
+        setSearchResult({
+          query,
+          cities: [],
+          error: "Nem sikerült lekérni a városokat.",
+        });
+      }
     }
-  }, [debouncedSearch]);
+
+    void searchCities();
+    return () => controller.abort();
+  }, [open, query, debouncedQuery]);
+
+  function resetSearch() {
+    setQuery("");
+    setSearchResult(undefined);
+  }
+
+  function handleClose() {
+    if (!canDismiss) return;
+
+    resetSearch();
+    onClose();
+  }
+
+  function handleCityClick(city: CityItem) {
+    resetSearch();
+    onSelectCity(city);
+  }
+
+  function handleSearchChange(event: ChangeEvent<HTMLInputElement>) {
+    const nextQuery = event.target.value.trim();
+    if (nextQuery === query) return;
+
+    setQuery(nextQuery);
+    setSearchResult(undefined);
+  }
 
   return (
     <Modal
@@ -141,7 +144,7 @@ export default function CityModal({
       aria-describedby="modal-description"
     >
       <Fade in={open}>
-        <Box sx={style}>
+        <Box sx={modalStyles}>
           <Typography id="modal-title" variant="h6" component="h2">
             Város kiválasztása
           </Typography>
@@ -156,7 +159,7 @@ export default function CityModal({
             placeholder="Keress településre"
             variant="outlined"
             helperText="Kereséshez írj be legalább két karaktert."
-            onChange={handleOnSearchChange}
+            onChange={handleSearchChange}
             slotProps={{
               input: {
                 startAdornment: (
@@ -173,7 +176,7 @@ export default function CityModal({
                       justifyContent: "center",
                     }}
                   >
-                    {isLoading && search.length >= 2 && (
+                    {isLoading && (
                       <CircularProgress size={20} thickness={4} disableShrink />
                     )}
                   </InputAdornment>
@@ -181,38 +184,33 @@ export default function CityModal({
               },
             }}
           />
-          {!!visibleCities.length && !isLoading && (
+          {cities.length > 0 && (
             <List id="modal-city-list">
-              {visibleCities.map((visibleCity, index) => {
-                return (
-                  <ListItem disablePadding key={index}>
-                    <ListItemButton
-                      onClick={() => handleOnCityClick(visibleCity)}
-                    >
-                      <ListItemText
-                        primary={visibleCity.name}
-                        secondary={
-                          (visibleCity.name === visibleCity.county
-                            ? ""
-                            : visibleCity.county + ", ") + visibleCity.country
-                        }
-                      />
-                      <ArrowForwardIosIcon fontSize="small" />
-                    </ListItemButton>
-                  </ListItem>
-                );
-              })}
+              {cities.map((city) => (
+                <ListItem
+                  disablePadding
+                  key={city.id ?? `${city.name}:${city.latitude},${city.longitude}`}
+                >
+                  <ListItemButton onClick={() => handleCityClick(city)}>
+                    <ListItemText
+                      primary={city.name}
+                      secondary={
+                        (city.name === city.county ? "" : `${city.county}, `) +
+                        city.country
+                      }
+                    />
+                    <ArrowForwardIosIcon fontSize="small" />
+                  </ListItemButton>
+                </ListItem>
+              ))}
             </List>
           )}
 
-          {!visibleCities.length &&
-            search.length >= 2 &&
-            canShowNotFoundOrError &&
-            !isLoading && (
-              <Typography id="modal-no-city" variant="body1" component="p">
-                {error ? error : "Nincs Találat"}
-              </Typography>
-            )}
+          {result && cities.length === 0 && (
+            <Typography id="modal-no-city" variant="body1" component="p">
+              {result.error ?? "Nincs Találat"}
+            </Typography>
+          )}
         </Box>
       </Fade>
     </Modal>

@@ -1,12 +1,31 @@
 import axios from "axios";
-import type { WeatherApiResponse, WeatherData } from "../types/forecast.types";
+import type { WeatherData } from "../types/forecast.types";
 
-export const getWeather = (
+interface WeatherApiResponse {
+  current: {
+    temperature_2m: number;
+    weather_code: number;
+  };
+  daily: {
+    precipitation_probability_max: number[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    time: string[];
+    weather_code: number[];
+  };
+}
+
+export async function getWeather(
   latitude: number,
   longitude: number,
-): Promise<WeatherData> => {
-  return axios
-    .get<WeatherApiResponse>("https://api.open-meteo.com/v1/forecast", {
+  signal?: AbortSignal,
+): Promise<WeatherData> {
+  const {
+    data: { current, daily },
+  } = await axios.get<WeatherApiResponse>(
+    "https://api.open-meteo.com/v1/forecast",
+    {
+      signal,
       params: {
         latitude,
         longitude,
@@ -20,22 +39,20 @@ export const getWeather = (
         timezone: "auto",
         forecast_days: 7,
       },
-    })
-    .then((response) => {
-      const { current, daily } = response.data;
+    },
+  );
 
-      return {
-        current: {
-          temperature: current.temperature_2m,
-          weatherCode: current.weather_code,
-        },
-        forecast: daily.time.map((time, index) => ({
-          time,
-          max: daily.temperature_2m_max[index],
-          min: daily.temperature_2m_min[index],
-          rainProbability: daily.precipitation_probability_max[index],
-          weatherCode: daily.weather_code[index],
-        })),
-      };
-    });
-};
+  return {
+    current: {
+      temperature: current.temperature_2m,
+      weatherCode: current.weather_code,
+    },
+    forecast: daily.time.map((time, index) => ({
+      time,
+      max: daily.temperature_2m_max[index],
+      min: daily.temperature_2m_min[index],
+      rainProbability: daily.precipitation_probability_max[index],
+      weatherCode: daily.weather_code[index],
+    })),
+  };
+}

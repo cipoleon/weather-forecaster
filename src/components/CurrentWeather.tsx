@@ -1,43 +1,39 @@
 import { Box, Typography } from "@mui/material";
-import type { CityItem } from "../types/city.types";
-import { conditions, type WeatherData } from "../types/forecast.types";
-
-const style = {
-  ml: { xs: 0, md: 4 },
-  "& #current-temperature, & #current-weather": {
-    mt: 1,
-  },
-};
+import type { CurrentConditions } from "../types/forecast.types";
+import { conditions } from "../weather";
 
 type CurrentWeatherProps = {
-  city: CityItem | undefined;
-  forecast: WeatherData;
-  setOpen: (open: boolean) => void;
+  cityName?: string;
+  current: CurrentConditions;
+  onChooseCity: () => void;
 };
 
 export default function CurrentWeather({
-  city,
-  forecast,
-  setOpen,
+  cityName,
+  current,
+  onChooseCity,
 }: CurrentWeatherProps) {
   return (
-    <>
-      <Box sx={style}>
-        <Typography
-          id="current-city"
-          variant="caption"
-          component="h2"
-          onClick={() => setOpen(true)}
-        >
-          {city?.name ? city.name : ""}
-        </Typography>
-        <Typography id="current-temperature" variant="h3" component="p">
-          {Math.round(forecast.current.temperature)}
-        </Typography>
-        <Typography id="current-weather">
-          {conditions[forecast.current.weatherCode || 0]?.label || ""}
-        </Typography>
-      </Box>
-    </>
+    <Box sx={{ ml: { xs: 0, md: 4 } }}>
+      <Typography
+        id="current-city"
+        variant="caption"
+        component="h2"
+        onClick={onChooseCity}
+      >
+        {cityName ?? ""}
+      </Typography>
+      <Typography
+        id="current-temperature"
+        sx={{ mt: 1 }}
+        variant="h3"
+        component="p"
+      >
+        {Math.round(current.temperature)}
+      </Typography>
+      <Typography id="current-weather" sx={{ mt: 1 }}>
+        {conditions[current.weatherCode || 0]?.label ?? ""}
+      </Typography>
+    </Box>
   );
 }

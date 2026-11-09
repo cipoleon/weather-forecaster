@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { WeatherIcon } from "../types/forecast.types";
+import type { WeatherIconKind } from "../types/forecast.types";
 
 const sun = (
   <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" />
@@ -7,7 +7,7 @@ const sun = (
 const cloud = (
   <path d="M6.5 16.5a4 4 0 1 1 .6-8 5.4 5.4 0 0 1 10.3 1 3.5 3.5 0 1 1 .6 7Z" />
 );
-const icons: Record<WeatherIcon, ReactNode> = {
+const icons: Record<WeatherIconKind, ReactNode> = {
   sun,
   partlyCloudy: (
     <>
@@ -48,7 +48,7 @@ const icons: Record<WeatherIcon, ReactNode> = {
   ),
 };
 
-export function WeatherIcon({ kind }: { kind: WeatherIcon }) {
+export function WeatherIcon({ kind }: { kind: WeatherIconKind }) {
   return (
     <svg
       width={40}
