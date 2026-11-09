@@ -1,1 +1,2 @@
-Ha lenne több időm skeletont is csináltam volna
+Elindításhoz:
+npm run dev
