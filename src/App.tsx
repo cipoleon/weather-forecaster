@@ -1,5 +1,5 @@
-import { Box, Typography } from "@mui/material";
-import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
+import { Box, Button, Typography } from "@mui/material";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getWeather } from "./api/forecastApi";
 import ApplicantName from "./components/ApplicantName";
@@ -8,13 +8,8 @@ import CurrentWeather from "./components/CurrentWeather";
 import SevenDayForecast from "./components/SevenDayForecast";
 import SevenDayForecastGraph from "./components/SevenDayForecastGraph";
 import type { CityItem } from "./types/city.types";
-import type { WeatherData } from "./types/forecast.types";
 
 const SAVED_CITY_KEY = "city";
-const EMPTY_WEATHER: WeatherData = {
-  current: { temperature: 0, weatherCode: -1 },
-  forecast: [],
-};
 
 function readSavedCity(): CityItem | undefined {
   try {
@@ -38,15 +33,16 @@ function App() {
   const [city, setCity] = useState(readSavedCity);
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(() => !city);
   const {
-    data: weather = EMPTY_WEATHER,
+    data: weather,
     isError: hasWeatherError,
+    isPending,
+    isFetching,
     refetch: refreshForecast,
   } = useQuery({
     queryKey: ["forecast", city?.latitude, city?.longitude],
     queryFn: city
       ? ({ signal }) => getWeather(city.latitude, city.longitude, signal)
       : skipToken,
-    placeholderData: keepPreviousData,
   });
 
   function handleCitySelection(nextCity: CityItem) {
@@ -69,6 +65,7 @@ function App() {
   return (
     <>
       <Box
+        component="main"
         sx={{
           width: { xs: "80%", md: "100%" },
           transform: { xs: "translateX(10%)", md: "translateX(0)" },
@@ -80,25 +77,56 @@ function App() {
       >
         <Box sx={{ minWidth: "200px" }}>
           <CurrentWeather
-            current={weather.current}
+            current={weather?.current}
             cityName={city?.name}
+            isCityPickerOpen={isCityPickerOpen}
             onChooseCity={() => setIsCityPickerOpen(true)}
           />
-          {!hasWeatherError && <ApplicantName />}
+          <ApplicantName />
         </Box>
 
-        {!hasWeatherError && (
-          <Box sx={{ flex: "auto", minWidth: 0 }}>
-            <SevenDayForecast forecast={weather.forecast} />
-            <SevenDayForecastGraph forecast={weather.forecast} />
+        <Box sx={{ flex: "auto", minWidth: 0 }}>
+          {!city && (
+            <Typography role="status">
+              Válassz várost az időjárás megtekintéséhez.
+            </Typography>
+          )}
+          {city && (
+            <>
+              {hasWeatherError && (
+                <Typography role="alert" sx={{ mb: 2 }}>
+                  Nem sikerült betölteni az időjárási adatokat. Próbáld újra.
+                </Typography>
+              )}
+              <Typography role="status" aria-live="polite">
+                {isFetching &&
+                  (isPending
+                    ? "Időjárási adatok betöltése…"
+                    : "Időjárási adatok frissítése…")}
+              </Typography>
+              <Button
+                variant="outlined"
+                color="inherit"
+                size="small"
+                disabled={isFetching}
+                onClick={() => void refreshForecast()}
+                aria-label="Időjárási adatok újratöltése"
+                sx={{ mb: 2 }}
+              >
+                Újratöltés
+              </Button>
+            </>
+          )}
+          <Box aria-busy={!!city && isFetching}>
+            {weather && (
+              <>
+                <SevenDayForecast forecast={weather.forecast} />
+                <SevenDayForecastGraph forecast={weather.forecast} />
+              </>
+            )}
           </Box>
-        )}
+        </Box>
       </Box>
-      {hasWeatherError && (
-        <Typography variant="h4" component="h2">
-          Nem sikerült betölteni az időjárási adatokat.
-        </Typography>
-      )}
       <CityModal
         open={isCityPickerOpen}
         canDismiss={!!city}

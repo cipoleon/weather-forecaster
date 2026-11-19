@@ -36,9 +36,9 @@ export default function SevenDayForecast({ forecast }: SevenDayForecastProps) {
                     kind={conditions[day.weatherCode]?.icon ?? "unknown"}
                   />
                   <Typography
-                    sx={{ lineHeight: "40px" }}
+                    sx={{ display: "block", lineHeight: "40px" }}
                     variant="caption"
-                    component="h2"
+                    component="span"
                   >
                     {`${day.rainProbability}%`}
                   </Typography>
@@ -46,7 +46,7 @@ export default function SevenDayForecast({ forecast }: SevenDayForecastProps) {
               </ListItemText>
               <ListItemText
                 sx={forecastCellSx}
-                primary={`${Math.round(day.min)} °C / ${Math.round(day.max)}°C`}
+                primary={`${Math.round(day.min)} °C / ${Math.round(day.max)} °C`}
               />
             </ListItem>
           ))}

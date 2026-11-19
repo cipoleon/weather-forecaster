@@ -10,7 +10,7 @@ const signatureStyles = {
 export default function ApplicantName() {
   return (
     <Box sx={signatureStyles}>
-      <Typography variant="caption" component="h2">
+      <Typography variant="caption" component="p">
         Aux Ciprián
       </Typography>
     </Box>

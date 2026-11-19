@@ -17,7 +17,7 @@ const series: LineChartProps["series"] = [
   {
     id: "daily-max",
     dataKey: "max",
-    label: "7 nap előre jelzése",
+    label: "7 napos előrejelzés",
     curve: "monotoneX",
     color: "#ffffff",
     showMark: true,

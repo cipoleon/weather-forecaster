@@ -3,6 +3,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import {
   Modal,
   Box,
+  Button,
   Typography,
   TextField,
   InputAdornment,
@@ -76,14 +77,22 @@ export default function CityModal({
   const debouncedQuery = useDebounce(query);
   const canSearch = open && query.length >= MIN_SEARCH_LENGTH;
   const activeQuery = canSearch && query === debouncedQuery ? query : undefined;
-  const { data: cities = [], isError, isPending } = useQuery({
+  const {
+    data: cities = [],
+    isError,
+    isPending,
+    isFetching,
+    errorUpdatedAt,
+    refetch,
+  } = useQuery({
     queryKey: ["city-search", activeQuery],
     queryFn: activeQuery
       ? ({ signal }) => getCities(activeQuery, signal)
       : skipToken,
     staleTime: CITY_SEARCH_STALE_TIME,
   });
-  const isLoading = canSearch && isPending;
+  const isLoading = canSearch && (isPending || isFetching);
+  const hasSearchError = isError || (isPending && errorUpdatedAt > 0);
 
   function handleClose() {
     if (!canDismiss) return;
@@ -106,11 +115,17 @@ export default function CityModal({
       open={open}
       onClose={handleClose}
       closeAfterTransition
-      aria-labelledby="modal-title"
-      aria-describedby="modal-description"
     >
       <Fade in={open}>
-        <Box sx={modalStyles}>
+        <Box
+          id="city-picker-dialog"
+          sx={modalStyles}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+          aria-describedby="modal-description"
+          tabIndex={-1}
+        >
           <Typography id="modal-title" variant="h6" component="h2">
             Város kiválasztása
           </Typography>
@@ -119,6 +134,7 @@ export default function CityModal({
             látni.
           </Typography>
           <TextField
+            autoFocus
             fullWidth
             className="modal-search-input"
             label=""
@@ -127,6 +143,10 @@ export default function CityModal({
             helperText="Kereséshez írj be legalább két karaktert."
             onChange={handleSearchChange}
             slotProps={{
+              htmlInput: {
+                "aria-label": "Település keresése",
+                "aria-busy": isLoading,
+              },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -143,7 +163,12 @@ export default function CityModal({
                     }}
                   >
                     {isLoading && (
-                      <CircularProgress size={20} thickness={4} disableShrink />
+                      <CircularProgress
+                        size={20}
+                        thickness={4}
+                        disableShrink
+                        aria-label="Városok keresése"
+                      />
                     )}
                   </InputAdornment>
                 ),
@@ -151,7 +176,7 @@ export default function CityModal({
             }}
           />
           {cities.length > 0 && (
-            <List id="modal-city-list">
+            <List id="modal-city-list" aria-label="Keresési találatok">
               {cities.map((city) => (
                 <ListItem
                   disablePadding
@@ -172,11 +197,40 @@ export default function CityModal({
             </List>
           )}
 
-          {activeQuery && !isPending && cities.length === 0 && (
-            <Typography id="modal-no-city" variant="body1" component="p">
-              {isError ? "Nem sikerült lekérni a városokat." : "Nincs Találat"}
-            </Typography>
+          {activeQuery && hasSearchError && (
+            <Box
+              role="alert"
+              sx={{ mt: 2, textAlign: "center", color: "var(--text-modal)" }}
+            >
+              <Typography component="p">
+                Nem sikerült lekérni a városokat.
+              </Typography>
+              <Button
+                type="button"
+                variant="outlined"
+                size="small"
+                sx={{ mt: 1 }}
+                disabled={isFetching}
+                onClick={() => void refetch()}
+              >
+                Újrapróbálás
+              </Button>
+            </Box>
           )}
+          {activeQuery &&
+            !isPending &&
+            !isFetching &&
+            !isError &&
+            cities.length === 0 && (
+              <Typography
+                id="modal-no-city"
+                variant="body1"
+                component="p"
+                role="status"
+              >
+                Nincs találat
+              </Typography>
+            )}
         </Box>
       </Fade>
     </Modal>
